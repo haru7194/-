@@ -19,7 +19,7 @@ hobby = st.multiselect('趣味を次から選択してください',['映画','�
 st.write(hobby)
 
 list = [
-  {'latitude':35.05,'longitude':135.76}
+  {'latitude':35.05,'longitude':135.76},
   {'latitude':35.04,'longitude':135.75}
 ]
 st.map(list)
