@@ -1,0 +1,81 @@
+import streamlit as st
+import pandas as pd
+import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
+
+# --- 1. データ準備 (本来はGoogleスプレッドシートから読み込む) ---
+# ここではデモ用に、各学部の「平均的な学生プロファイル」を定義します
+def load_univ_data():
+    # 属性: [E/I, S/N, T/F, J/P, 外向的趣味, 内向的趣味, 理系科目, 文系科目]
+    # 1に近いほど前者の性質、0に近いほど後者の性質
+    data = {
+        "経済学部": [0.7, 0.6, 0.8, 0.5, 0.8, 0.3, 0.7, 0.6],
+        "法学部":   [0.4, 0.8, 0.9, 0.9, 0.4, 0.6, 0.3, 0.9],
+        "理学部":   [0.2, 0.9, 0.9, 0.6, 0.3, 0.8, 0.9, 0.2],
+        "工学部":   [0.5, 0.7, 0.8, 0.7, 0.6, 0.7, 0.9, 0.3],
+        "文学部":   [0.3, 0.4, 0.3, 0.5, 0.3, 0.9, 0.2, 0.9],
+        "経営学部": [0.9, 0.5, 0.7, 0.6, 0.9, 0.2, 0.6, 0.7]
+    }
+    return pd.DataFrame(data).T
+
+# --- 2. ユーザー入力の数値化関数 ---
+def preprocess_input(mbti, hobbies, subjects):
+    # MBTIの変換 (例: Eなら1, Iなら0)
+    v1 = 1 if mbti[0] == 'E' else 0
+    v2 = 1 if mbti[1] == 'S' else 0
+    v3 = 1 if mbti[2] == 'T' else 0
+    v4 = 1 if mbti[3] == 'J' else 0
+    
+    # 趣味・科目の傾向 (簡易的な重み付け)
+    v5 = 1 if "スポーツ" in hobbies or "旅行" in hobbies else 0.5
+    v6 = 1 if "読書" in hobbies or "ゲーム" in hobbies else 0.5
+    v7 = 1 if "数学" in subjects or "理科" in subjects else 0
+    v8 = 1 if "国語" in subjects or "社会" in subjects else 0
+    
+    return np.array([v1, v2, v3, v4, v5, v6, v7, v8]).reshape(1, -1)
+
+# --- 3. UI部分 (Streamlit) ---
+st.set_page_config(page_title="学部マッチング診断", layout="centered")
+
+st.title("🎓 学部マッチング診断 AI")
+st.write("あなたの性格や趣味から、相性の良い学部を在校生のデータに基づいて推薦します。")
+
+# 入力フォーム
+with st.container():
+    st.subheader("あなたのことを教えてください")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        mbti = st.selectbox("MBTIタイプを選択", [
+            "INTJ", "INTP", "ENTJ", "ENTP", "INFJ", "INFP", "ENFJ", "ENFP",
+            "ISTJ", "ISFJ", "ESTJ", "ESFJ", "ISTP", "ISFP", "ESTP", "ESFP"
+        ])
+    
+    hobbies = st.multiselect("興味のあるもの（複数回答可）", 
+                           ["スポーツ", "旅行", "読書", "ゲーム", "音楽", "ボランティア"])
+    
+    subjects = st.multiselect("得意・好きな科目", 
+                            ["国語", "数学", "英語", "理科", "社会"])
+
+# 診断ボタン
+if st.button("診断スタート！"):
+    # データ読み込みと計算
+    univ_df = load_univ_data()
+    user_vector = preprocess_input(mbti, hobbies, subjects)
+    
+    # 類似度計算
+    similarities = cosine_similarity(user_vector, univ_df.values)
+    results = pd.Series(similarities[0], index=univ_df.index).sort_values(ascending=False)
+    
+    # 結果表示
+    st.balloons()
+    st.header(f"あなたに一番近いのは... 「{results.index[0]}」です！")
+    
+    # グラフ表示で視覚化
+    st.subheader("学部ごとのマッチ度")
+    st.bar_chart(results)
+    
+    st.info(f"解説: あなたの性格タイプ「{mbti}」と、選択した興味関心は、{results.index[0]}に所属する先輩たちの傾向と非常に高い類似性（{results.values[0]:.2f}）を示しています。")
+
+st.markdown("---")
+st.caption("※この診断はオープンキャンパス用のデモです。実際の在校生アンケートに基づいたプロトタイプとして活用してください。")
